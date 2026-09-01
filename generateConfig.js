@@ -1,26 +1,19 @@
 const fs = require('fs')
 const path = require('path')
 const { register_anonimous } = require('./main')
-const { cookieToJson, generateRandomChineseIP } = require('./util/index')
+const {
+  cookieToJson,
+  generateDeviceId,
+  generateRandomChineseIP,
+} = require('./util/index')
 const { getXeapiPublicKey } = require('./util/xeapiKey')
 const tmpPath = require('os').tmpdir()
 
 async function generateConfig() {
   global.cnIp = generateRandomChineseIP()
-  try {
-    const res = await register_anonimous()
-    const cookie = res.body.cookie
-    if (cookie) {
-      const cookieObj = cookieToJson(cookie)
-      fs.writeFileSync(
-        path.resolve(tmpPath, 'anonymous_token'),
-        cookieObj.MUSIC_A,
-        'utf-8',
-      )
-    }
-  } catch (error) {
-    console.log(error)
-  }
+  // xeapi requests require a public key. Bootstrap the key before the
+  // anonymous registration request on a fresh container.
+  global.deviceId = generateDeviceId()
   try {
     let currentPublicKey = {}
     try {
@@ -34,6 +27,20 @@ async function generateConfig() {
       JSON.stringify(publicKey),
       'utf-8',
     )
+  } catch (error) {
+    console.log(error)
+  }
+  try {
+    const res = await register_anonimous({ deviceId: global.deviceId })
+    const cookie = res.body.cookie
+    if (cookie) {
+      const cookieObj = cookieToJson(cookie)
+      fs.writeFileSync(
+        path.resolve(tmpPath, 'anonymous_token'),
+        cookieObj.MUSIC_A,
+        'utf-8',
+      )
+    }
   } catch (error) {
     console.log(error)
   }
