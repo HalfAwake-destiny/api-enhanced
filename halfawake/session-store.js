@@ -78,7 +78,10 @@ class SessionStore {
   assertResult(result, operation) {
     if (result?.error) {
       const message = result.error.message || String(result.error)
-      throw new Error(`CloudBase ${operation} failed: ${message}`)
+      const error = new Error(`CloudBase ${operation} failed: ${message}`)
+      error.code = result.error.code
+      error.status = result.status
+      throw error
     }
     return result?.data
   }

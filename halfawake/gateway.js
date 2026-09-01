@@ -37,6 +37,19 @@ function publicBody(result) {
   return body
 }
 
+function databaseDiagnostic(error) {
+  const message = String(error?.message || error || 'Unknown database error')
+    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/MUSIC_[UA]=[^;\s]+/gi, 'MUSIC_U=[redacted]')
+    .slice(0, 300)
+  return {
+    name: error?.name || 'Error',
+    code: error?.code || null,
+    status: error?.status || null,
+    message,
+  }
+}
+
 function createHalfawakeGateway() {
   const router = express.Router()
   const envId = process.env.HALFAWAKE_CLOUDBASE_ENV_ID
@@ -230,8 +243,12 @@ function createHalfawakeGateway() {
         refreshedAt: session.refreshed_at,
         checkedAt: session.checked_at,
       })
-    } catch (_) {
-      res.status(503).json({ code: 503, message: 'Database unavailable.' })
+    } catch (error) {
+      res.status(503).json({
+        code: 503,
+        message: 'Database unavailable.',
+        diagnostic: databaseDiagnostic(error),
+      })
     }
   })
 
