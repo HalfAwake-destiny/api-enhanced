@@ -10,7 +10,7 @@
 在现有云托管服务的新版本中保留原有变量，并新增：
 
 ```env
-HALFAWAKE_CLOUDBASE_ENV_ID=half-awake-d9g69y6lb5d5f79b
+HALFAWAKE_CLOUDBASE_ENV_ID=half-awake-d9g69y6lb5d5f79b0
 HALFAWAKE_CLOUDBASE_DATABASE=pgdb-i6izmvlb
 CLOUDBASE_APIKEY=CloudBase服务端APIKey
 NETEASE_SESSION_KEY=至少32字节随机密钥
