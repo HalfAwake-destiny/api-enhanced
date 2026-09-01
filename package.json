@@ -75,6 +75,7 @@
     "data"
   ],
   "dependencies": {
+    "@cloudbase/node-sdk": "^3.18.3",
     "@neteasecloudmusicapienhanced/unblockmusic-utils": "^0.4.4",
     "axios": "^1.20.0",
     "crypto-js": "^4.2.0",

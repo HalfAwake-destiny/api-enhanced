@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Half Awake 音乐会话</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #171b21; color: #edf2f5; }
+    * { box-sizing: border-box; }
+    body { display: grid; min-height: 100vh; margin: 0; padding: 24px; place-items: center; }
+    main { width: min(420px, 100%); }
+    header { padding-bottom: 18px; border-bottom: 1px solid #343b45; }
+    h1 { margin: 0; font-size: 20px; }
+    header p, #message { color: #9ca8b5; font-size: 13px; line-height: 1.6; }
+    label { display: block; margin: 20px 0 6px; color: #aeb8c2; font-size: 12px; }
+    .row { display: flex; gap: 8px; }
+    input { min-width: 0; flex: 1; padding: 11px 12px; border: 1px solid #3b4652; border-radius: 6px; outline: none; background: #20262f; color: inherit; }
+    input:focus { border-color: #45a7c8; }
+    button { padding: 10px 14px; border: 0; border-radius: 6px; background: #45a7c8; color: white; cursor: pointer; }
+    button.secondary { border: 1px solid #3b4652; background: transparent; color: #c7d0d8; }
+    button:disabled { cursor: wait; opacity: .55; }
+    #session { margin-top: 18px; padding: 14px 0; border-top: 1px solid #343b45; border-bottom: 1px solid #343b45; }
+    #profile { display: flex; align-items: center; gap: 10px; }
+    #profile img { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
+    #profile strong, #profile span { display: block; }
+    #profile span { margin-top: 3px; color: #8fa0ad; font-size: 12px; }
+    #qr { display: none; width: 220px; height: 220px; margin: 22px auto 8px; padding: 8px; background: white; }
+    #actions { display: flex; gap: 8px; margin-top: 16px; }
+    .ok { color: #70c99b !important; }
+    .error { color: #e27b8d !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <header><h1>网易云会话管理</h1><p>仅用于站长扫码与维护服务器登录态。管理密钥只保存在当前页面内存中。</p></header>
+    <label for="token">管理密钥</label>
+    <div class="row"><input id="token" type="password" autocomplete="off"><button id="connect">检查</button></div>
+    <section id="session" hidden><div id="profile"></div><div id="actions"><button id="login">重新扫码</button><button id="refresh" class="secondary">立即刷新</button></div></section>
+    <img id="qr" alt="网易云登录二维码">
+    <p id="message">请输入 CloudBase 中配置的 MUSIC_ADMIN_TOKEN。</p>
+  </main>
+  <script>
+    const tokenInput = document.querySelector('#token')
+    const connectButton = document.querySelector('#connect')
+    const loginButton = document.querySelector('#login')
+    const refreshButton = document.querySelector('#refresh')
+    const session = document.querySelector('#session')
+    const profile = document.querySelector('#profile')
+    const qr = document.querySelector('#qr')
+    const message = document.querySelector('#message')
+    let token = ''
+    let pollTimer
+
+    const request = async (path, options = {}) => {
+      const response = await fetch(path, {
+        ...options,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      })
+      const body = await response.json()
+      if (!response.ok) throw new Error(body.message || '请求失败')
+      return body
+    }
+    const showMessage = (text, type = '') => {
+      message.textContent = text
+      message.className = type
+    }
+    const showStatus = (data) => {
+      session.hidden = false
+      profile.replaceChildren()
+      if (data.loggedIn && data.profile) {
+        const image = document.createElement('img')
+        const details = document.createElement('div')
+        const name = document.createElement('strong')
+        const meta = document.createElement('span')
+        image.src = data.profile.avatarUrl || ''
+        image.alt = ''
+        name.textContent = data.profile.nickname || '已登录'
+        meta.textContent = `UID ${data.profile.userId} · ${data.status}`
+        details.append(name, meta)
+        profile.append(image, details)
+        showMessage('服务器登录态正常。', 'ok')
+      } else {
+        const details = document.createElement('div')
+        const name = document.createElement('strong')
+        const meta = document.createElement('span')
+        name.textContent = '尚未登录'
+        meta.textContent = '请使用网易云 App 扫码'
+        details.append(name, meta)
+        profile.append(details)
+        showMessage('需要完成首次扫码登录。')
+      }
+    }
+    const loadStatus = async () => showStatus(await request('/halfawake/admin/status'))
+
+    connectButton.addEventListener('click', async () => {
+      token = tokenInput.value
+      try { await loadStatus() } catch (error) { showMessage(error.message, 'error') }
+    })
+    loginButton.addEventListener('click', async () => {
+      clearInterval(pollTimer)
+      try {
+        const data = await request('/halfawake/admin/qr/start', { method: 'POST' })
+        qr.src = data.qrimg
+        qr.style.display = 'block'
+        showMessage('请使用网易云音乐 App 扫码并确认。')
+        pollTimer = setInterval(async () => {
+          try {
+            const state = await request('/halfawake/admin/qr/check', { method: 'POST', body: JSON.stringify({ key: data.key }) })
+            if (state.code === 803) {
+              clearInterval(pollTimer)
+              qr.style.display = 'none'
+              await loadStatus()
+            } else if (state.code === 800) {
+              clearInterval(pollTimer)
+              showMessage('二维码已过期，请重新生成。', 'error')
+            } else if (state.code === 802) showMessage('已扫码，请在网易云 App 中确认。')
+          } catch (error) {
+            clearInterval(pollTimer)
+            showMessage(error.message, 'error')
+          }
+        }, 2200)
+      } catch (error) { showMessage(error.message, 'error') }
+    })
+    refreshButton.addEventListener('click', async () => {
+      try {
+        const data = await request('/halfawake/admin/refresh', { method: 'POST' })
+        showMessage(data.code === 200 ? '登录态已刷新。' : '刷新失败，需要重新扫码。', data.code === 200 ? 'ok' : 'error')
+        await loadStatus()
+      } catch (error) { showMessage(error.message, 'error') }
+    })
+  </script>
+</body>
+</html>

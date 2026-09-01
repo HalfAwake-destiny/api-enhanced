@@ -11,6 +11,7 @@ const fileUpload = require('express-fileupload')
 const decode = require('safe-decode-uri-component')
 const logger = require('./util/logger.js')
 const { APP_CONF } = require('./util/config.json')
+const { createHalfawakeGateway } = require('./halfawake/gateway.js')
 
 /**
  * The version check result.
@@ -258,6 +259,10 @@ async function constructServer(moduleDefs) {
       parseNested: true,
     }),
   )
+
+  // Blog-specific authenticated routes are mounted before the generic cache.
+  // They keep the private NetEase session on the server and never expose it.
+  app.use(createHalfawakeGateway())
 
   /**
    * Cache

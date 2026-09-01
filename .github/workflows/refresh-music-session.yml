@@ -1,0 +1,26 @@
+name: Refresh music session
+
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep the NetEase session fresh
+        env:
+          MUSIC_API_URL: ${{ secrets.MUSIC_API_URL }}
+          MUSIC_ADMIN_TOKEN: ${{ secrets.MUSIC_ADMIN_TOKEN }}
+        run: |
+          test -n "$MUSIC_API_URL"
+          test -n "$MUSIC_ADMIN_TOKEN"
+          curl --fail-with-body --silent --show-error \
+            --retry 2 \
+            --request POST \
+            --header "Authorization: Bearer $MUSIC_ADMIN_TOKEN" \
+            "${MUSIC_API_URL%/}/halfawake/admin/maintain"
