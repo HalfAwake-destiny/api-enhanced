@@ -53,18 +53,20 @@ function databaseDiagnostic(error) {
 function createHalfawakeGateway() {
   const router = express.Router()
   const envId = process.env.HALFAWAKE_CLOUDBASE_ENV_ID
-  const database = process.env.HALFAWAKE_CLOUDBASE_DATABASE
+  const databaseInstance = process.env.HALFAWAKE_CLOUDBASE_DATABASE
+  const databaseSchema = process.env.HALFAWAKE_CLOUDBASE_SCHEMA || 'public'
   const cloudbaseApiKey = process.env.CLOUDBASE_APIKEY
   const encryptionKey = process.env.NETEASE_SESSION_KEY
   const adminToken = process.env.MUSIC_ADMIN_TOKEN
   const configured = Boolean(
-    envId && database && cloudbaseApiKey && encryptionKey && adminToken,
+    envId && databaseInstance && cloudbaseApiKey && encryptionKey && adminToken,
   )
   let store = null
   if (configured) {
     store = new SessionStore({
       envId,
-      database,
+      databaseInstance,
+      databaseSchema,
       accessKey: cloudbaseApiKey,
       encryptionKey,
     })
