@@ -64,14 +64,14 @@ function sameSecret(actual, expected) {
 }
 
 class SessionStore {
-  constructor({ envId, accessKey, encryptionKey }) {
+  constructor({ envId, database, accessKey, encryptionKey }) {
     this.key = crypto.createHash('sha256').update(encryptionKey).digest()
     this.db = cloudbase
       .init({
         env: envId,
         accessKey,
       })
-      .rdb()
+      .rdb({ database })
     this.table = 'halfawake_netease_session'
   }
 

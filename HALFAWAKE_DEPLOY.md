@@ -11,11 +11,15 @@
 
 ```env
 HALFAWAKE_CLOUDBASE_ENV_ID=half-awake-d9g69y6lb5d5f79b
+HALFAWAKE_CLOUDBASE_DATABASE=pgdb-i6izmvlb
 CLOUDBASE_APIKEY=CloudBase服务端APIKey
 NETEASE_SESSION_KEY=至少32字节随机密钥
 MUSIC_ADMIN_TOKEN=至少32字节随机管理密钥
 HALFAWAKE_NETEASE_UID=1937961682
 ```
+
+`HALFAWAKE_CLOUDBASE_DATABASE` 必须使用 SQL 编辑器中
+`SELECT current_database()` 返回的数据库名，不能填写 CloudBase 环境 ID。
 
 体验版共享集群不需要配置数据库密码、内网地址或 `DATABASE_URL`。
 
