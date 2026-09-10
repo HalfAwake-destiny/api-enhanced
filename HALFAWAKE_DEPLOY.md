@@ -67,3 +67,40 @@ PUBLIC_NETEASE_API_URL=https://half-awake-306542-11-1454995027.sh.run.tcloudbase
 ```
 
 `PUBLIC_NETEASE_UID` 已不再使用，可以删除。先部署 API 并完成首次扫码，再部署博客。
+
+## 用户各自登录（小程序）
+
+除站长会话外，`/halfawake/user/*` 让每个用户登录自己的网易云账号。**不需要建表、不需要迁移**：
+登录成功后服务端把该用户的网易云 cookie 用 `NETEASE_SESSION_KEY` 做 AES-256-GCM 密封成 token，
+客户端只存 token，每次请求带回来，服务端解开用。cookie 永远不会下发到客户端。
+
+| 接口 | 方法 | 说明 |
+|---|---|---|
+| `/halfawake/user/captcha` | POST | body `{ phone, ctcode? }`，发短信验证码；同手机号/设备 60 秒 1 条、1 小时 5 条 |
+| `/halfawake/user/login` | POST | body `{ phone, captcha }` 或 `{ phone, password }`，成功返回 `{ token, profile }` |
+| `/halfawake/user/status` | GET | 带 `Authorization: Bearer <token>`；顺带用 `login_refresh` 续期，续上了会返回新 `token` |
+| `/halfawake/user/logout` | POST | 尽力通知网易云登出，客户端丢掉 token 即可 |
+| `/halfawake/user/playlists` | GET | 该用户的歌单（需要 token） |
+| `/halfawake/user/playlist/tracks` | GET | 该用户某个歌单的歌曲（需要 token） |
+| `/halfawake/stream` | GET | **音频代理**，`?id=&level=standard`，透传 `Range`；支持 `?token=`（音频没法带请求头） |
+
+`/halfawake/stream` 是给小程序真机用的：网易给的播放地址是 `http://m*.music.126.net/...`，
+小程序真机只允许 https 且域名不可配置，所以必须由本服务转成自己域名的 https。
+
+管理员的 `MUSIC_ADMIN_TOKEN` **只认请求头**（`bearerToken`），不接受 `?token=`，避免密钥进 URL / 日志；
+用户 token 才额外认 `?token=`（`userToken`），因为 `wx.createInnerAudioContext` 带不了请求头。
+
+**登录可能被网易风控拦（返回 `code: -462` 要求人机验证）**，小程序里渲染不了那个验证页，
+所以接口会明确回一条提示；公共曲库（站点会话）不受影响，未登录照样能搜能听。
+
+## 上线后自测
+
+不需要新增环境变量，沿用现有的即可（`NETEASE_SESSION_KEY` 必须已配置，否则 `/user/*` 返回 503）。
+
+```text
+GET  /halfawake/user/status                -> {"code":200,"loggedIn":false}
+POST /halfawake/user/login  假验证码        -> {"code":-462,...} 或 {"code":400,...}（说明链路通）
+GET  /halfawake/stream?id=347230           -> 不带 token 时走站点会话，应返回音频流而不是 401
+GET  /halfawake/search?keywords=test       -> 原来的公共接口不受影响
+```
+
