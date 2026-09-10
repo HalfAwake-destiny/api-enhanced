@@ -580,13 +580,25 @@ function createHalfawakeGateway() {
     }
   })
 
-  router.get(
-    '/halfawake/search',
-    handle(cloudsearch, (req) => ({
+  // 搜索：网易风控会拦默认的加密方式（eapi 打 /api/cloudsearch/pc 会回 -462 人机验证），
+  // 实测 linuxapi（走 /api/linux/forward）不被拦。万一哪天它也被拦，再退回默认方式试一次。
+  router.get('/halfawake/search', async (req, res) => {
+    const query = {
       keywords: String(req.query.keywords || '').slice(0, 100),
       limit: numberParam(req.query.limit, { fallback: 20, min: 1, max: 30 }),
-    })),
-  )
+      noCookie: true,
+      crypto: 'linuxapi',
+    }
+    try {
+      let result = await call(cloudsearch, query)
+      if (result && result.body && result.body.code === -462) {
+        result = await call(cloudsearch, { ...query, crypto: '' })
+      }
+      res.status(result.status || 200).json(publicBody(result))
+    } catch (_) {
+      res.status(502).json({ code: 502, message: 'NetEase request failed.' })
+    }
+  })
   router.get(
     '/halfawake/playlists',
     requireConfigured,
