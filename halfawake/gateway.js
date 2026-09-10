@@ -386,8 +386,12 @@ function createHalfawakeGateway() {
       ? String(req.query.level)
       : 'standard'
     try {
+      // 站点会话是「站长账号」共享给所有访客用的（能听会员曲，但风险也记在站长账号上）。
+      // 设 HALFAWAKE_ALLOW_SITE_SESSION=false 就可以关掉，改为只认用户自己的登录态。
+      const allowSiteSession = process.env.HALFAWAKE_ALLOW_SITE_SESSION !== 'false'
       const cookie =
-        (payload && payload.cookie) || (configured ? await sessionCookie() : '')
+        (payload && payload.cookie) ||
+        (allowSiteSession && configured ? await sessionCookie() : '')
       if (!cookie) {
         res
           .status(401)
@@ -597,6 +601,47 @@ function createHalfawakeGateway() {
       res.status(result.status || 200).json(publicBody(result))
     } catch (_) {
       res.status(502).json({ code: 502, message: 'NetEase request failed.' })
+    }
+  })
+
+  // 公开歌单：按 uid 读「别人公开出来的歌单」，不需要任何登录态（小程序靠这个拿歌单）。
+  // 和搜索同理，默认加密方式会被风控拦（-462），必须走 linuxapi。
+  router.get('/halfawake/public/playlists', async (req, res) => {
+    const uid = String(req.query.uid || '').replace(/\D/g, '')
+    if (!uid) {
+      res.status(400).json({ code: 400, message: '缺少 uid' })
+      return
+    }
+    try {
+      const result = await call(userPlaylist, {
+        uid,
+        limit: numberParam(req.query.limit, { fallback: 50, min: 1, max: 100 }),
+        offset: numberParam(req.query.offset, { fallback: 0, min: 0, max: 1000 }),
+        crypto: 'linuxapi',
+        noCookie: true,
+      })
+      res.status(result.status || 200).json(publicBody(result))
+    } catch (_) {
+      res.status(502).json({ code: 502, message: '读取公开歌单失败' })
+    }
+  })
+
+  router.get('/halfawake/public/playlist/tracks', async (req, res) => {
+    const id = String(req.query.id || '').replace(/\D/g, '')
+    if (!id) {
+      res.status(400).json({ code: 400, message: '缺少歌单 id' })
+      return
+    }
+    try {
+      const result = await call(playlistTrackAll, {
+        id,
+        limit: numberParam(req.query.limit, { fallback: 200, min: 1, max: 500 }),
+        crypto: 'linuxapi',
+        noCookie: true,
+      })
+      res.status(result.status || 200).json(publicBody(result))
+    } catch (_) {
+      res.status(502).json({ code: 502, message: '读取公开歌单歌曲失败' })
     }
   })
   router.get(
